@@ -39,3 +39,44 @@
 (deftest node-path-test
   (are [x y] [= x y]
     '(17 14 11 8) (-> z1 z-d z-r z-d z-r z-d node-path content-map)))
+
+(def n [[0 0 :x] [0 1 :o]])
+(def n1 (let [moves (conj n [2 0 :o])]
+          (->node moves
+                  [(->node (conj moves [2 1 :o]) nil)])))
+
+(def dups-mock (->node n [n1 n1])) ;; purposely duplicating
+
+(deftest dups
+  (is (empty? (duplicates n)))
+  (is (empty? (duplicates n1)))
+  (is (= 2 (count (duplicates dups-mock)))))
+
+(deftest mirrors
+  ;; not all the cases here
+  (is (= [0 2] (vert-mirror [0 0])))
+  (is (= [0 1] (vert-mirror [0 1])))
+  (is (= [0 0] (vert-mirror [0 2])))
+  (is (= [2 0] (vert-mirror [2 2])))
+  (is (= [1 1] (vert-mirror [1 1])))
+
+  (is (= [2 0] (hor-mirror [0 0])))
+  (is (= [1 0] (hor-mirror [1 0])))
+  (is (= [0 0] (hor-mirror [2 0])))
+  (is (= [1 1] (hor-mirror [1 1])))
+
+  (is (= [1 1] (origin-mirror [1 1])))
+  (is (= [2 2] (origin-mirror [2 2])))
+  (is (= [0 2] (origin-mirror [2 0])))
+  (is (= [1 0] (origin-mirror [0 1])))
+  (is (= [1 2] (origin-mirror [2 1])))
+  (is (= [2 0] (origin-mirror [0 2])))
+  (is (= [0 1] (origin-mirror [1 0])))
+  (is (= [2 1] (origin-mirror [1 2])))
+
+  (is (= [1 1] (other-diag-mirror [1 1])))
+  (is (= [0 1] (other-diag-mirror [1 2])))
+  (is (= [1 2] (other-diag-mirror [0 1])))
+  (is (= [2 1] (other-diag-mirror [1 0])))
+  (is (= [1 0] (other-diag-mirror [2 1])))
+  (is (= [0 0] (other-diag-mirror [2 2]))))

@@ -15,14 +15,21 @@
 ;; Moves are a sequence of [x y p], where player is either :x or :o, and
 ;; x, y indicates the column and row of the move.
 
-(defn occupied? [board x y ]
+(defn occupied? [board x y]
   (not= ((board x) y) :_))
 
+(def all-pos (vec (for [x (range 0 3)
+                        y (range 0 3)]
+                    [x y])))
+
 ;; CHALLENGE 1: Implement this function. See toehold.core-test/available-moves-test
-(defn available-moves [board]
+
+;; AR the docstring goes before the arg list :)
+(defn available-moves
   "Return all empty positions as [x y]"
+  [board]
   ;; TODO note that project is unrunnable until this function is implemented
-  )
+  (remove (fn [[x y]] (occupied? board x y)) all-pos))
 
 (defn move [board [x y val]]
   (if (occupied? board x y)
@@ -38,8 +45,10 @@
 
 (defn- rand-player [] (rand-nth players))
 
+(def memoized-board board-from)
+
 (defn- rand-valid-move [moves & [player]]
-  (let [board (board-from moves) ; memoize?
+  (let [board (memoized-board moves) ; memoize?
         avl-moves (available-moves board)]
     ;; (println "moves:" moves "(" (cur-player moves) ")")
     ;; (println "board:" (board-from moves))
@@ -65,14 +74,16 @@
   [& args]
   (apply (first args) (rest args)))
 
-(defn diags [b]
+(defn diags
   "(mapv call b (range 3)) returns [((b 0) 0), ((b 1) 1), ((b 2) 2)]. Then
-we do the same thing but for [2 1 0]."
+  we do the same thing but for [2 1 0]."
+  [b]
   (vector (mapv call b (range 3))
           (mapv call b (reverse (range 3)))))
 
-(defn triplets [b]
+(defn triplets
   "Return all triplets of b that could qualify as a win"
+  [b]
   (concat (rows b) (cols b) (diags b)))
 
 (defn- check-triplet [triplet]

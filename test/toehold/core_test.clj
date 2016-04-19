@@ -1,6 +1,6 @@
 (ns toehold.core-test
   (:require [clojure.test :refer :all]
-            [toehold.core :refer :all]))
+            [toehold.core :refer :all] :reload-all))
 
 ;; Partial game example
 (def x1 [[1 1 :x] [1 2 :o] [2 2 :x] [2 0 :o]])
@@ -16,17 +16,18 @@
 (def b3 (board-from x3))
 
 (deftest available-moves-test
+
   (testing "Available moves"
     (are [x y] [= x y]
       #{[0 0] [0 1] [0 2] [1 0] [2 1]} (set (available-moves b1))
       #{} (set (available-moves b2))
       #{[0 0] [0 1] [1 0] [2 2]} (set (available-moves b3))
-      )))
+      ))
 
-(deftest full-test
-  (are [x y] (= x y)
-    false (full? x1)
-    true  (full? x2)))
+  (deftest full-test
+    (are [x y] (= x y)
+      false (full? x1)
+      true  (full? x2))))
 
 (deftest win-test
   (are [x y] (= x y)
