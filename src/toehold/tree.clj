@@ -188,10 +188,10 @@
 ;; 1. What percentage of 100000 random games have no win?
 
 (defn nowin-count [root]
-  (count (remove c/win? (map :content (tree-seq branch? children loc)))))
+  (count (remove c/win? (map :content (tree-seq branch? children root)))))
 
 (defn win% [root]
-  (let [final-boards (map :content (remove :children (tree-seq branch? children b)))
+  (let [final-boards (map :content (remove :children (tree-seq branch? children root)))
         wins (count (filter c/win? final-boards))]
     (/ wins (float (count final-boards)))))
 
