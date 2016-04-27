@@ -40,65 +40,26 @@
                      (node-str loc)))
         (recur (z/next loc)))))
 
-(defn node-count [loc]
-  (count (tree-seq branch? children loc)))
-
-(defn leaf-count [loc]
-  (count (remove :children (tree-seq branch? children loc))))
+(defn leaves
+  "Returns the leaves of the tree, warning, it can be big to display."
+  [loc]
+  (remove :children (tree-seq branch? children loc)))
 
 (defn node-path "Return the simple path of nodes up to and including this location, including the location"
   [loc]
   (conj (z/path loc) (z/node loc)))
 
 (defn dump
-  [root]
-  (spit "dump.txt" (with-out-str (print-tree (content-zipper root)))))
-
-(defn duplicates
-  [root]
-  (->> (tree-seq branch? children root)
-       (map :content)
-       frequencies
-       (filter #(> (val %) 1))
-       (map key)))
-
-;; CHALLENGE 2: Write a function to build a tree of all possible games. Explain
-;; why or why not it uses content-zipper (above).
-
-;; AR - Aren't zipper for traversing only? The following solution is naive,
-;; recursive and does not preserve the stack. The content of the node is
-;; basically the vec of moves so far.
-;; (node-count (build-tree)) => 549946 (quite a lot)
-;; (count (duplicates (build-tree))) => 0
-
-(defn helper
   [moves]
-  (let [avl-moves (->> moves
-                       c/board-from
-                       c/available-moves
-                       (map #(conj % (c/cur-player moves))))]
-    (if-not (c/full-or-win? moves)
-      (->node moves (map #(helper (conj moves %)) avl-moves))
-      (->node moves nil))))
+  (spit "dump.txt" (doall (string/join "\n" (map str moves)))))
 
-(defn build-tree
-  []
-  (helper []))
+(defn board-str
+  [moves]
+  (doall (string/join "\n" (board-from moves))))
 
-;; CHALLENGE 3: Is it possible to rewrite build-tree so that it's significantly
-;; more efficient in time and/or space? If so, what strategies do you see for
-;; that? Implement one.
-
-;; AR - given that the game is basically symmetrical on both x, y and diagonal,
-;; by trimming the unnecessary moves (for instance you can just calculate moves for
-;; positions [0 0], [0 1] and [1 1]) you explore the whole solution space but
-;; with a reduced branching factor.
-;; With the following:
-;; (node-count (build-tree*)) => 1233 (still not optimal)
-;; (count (duplicates (build-tree*))) => 0
-
-;; AR - I would still need to remove the configurations that are bound to finish in
-;; the same way of other previously explored but I have run out of time...
+(defn dump-boards
+  [moves-set]
+  (spit "dump.txt" (doall (string/join "\n\n" (map board-str moves-set)))))
 
 (defn vert-mirror
   [move]
@@ -108,12 +69,13 @@
   [move]
   (update move 0 #(-> % (- 1) - (+ 1))))
 
-(defn origin-mirror
+(defn main-diag-mirror
   [move]
-  [(second move)
-   (first move)])
+  (-> move
+      (assoc 0 (second move))
+      (assoc 1 (first move))))
 
-(defn other-diag-mirror
+(defn sec-diag-mirror
   [move]
   ;; AR - I was so rusty on this!
   (let [x (first move)
@@ -121,53 +83,100 @@
         c (- y x)             ;; for m' = 1 perpendicular to y = -x + 2
         int-x (/ (- 2 c) 2)   ;; intersection coords
         int-y (+ (- int-x) 2)] ;; again from y = -x + 2
-    [(- (long (* 2 int-x)) x)
-     (- (long (* 2 int-y)) y)]))
+    (-> move
+        (assoc 0 (- (long (* 2 int-x)) x))
+        (assoc 1 (- (long (* 2 int-y)) y)))))
 
-(defn reflections
-  "Return the set of reflections of a move"
+(defn reflection-move
+  "Return the set of reflections of a single"
   [move]
-  (->> ((juxt hor-mirror vert-mirror origin-mirror other-diag-mirror) move)
+  (->> ((juxt hor-mirror vert-mirror main-diag-mirror sec-diag-mirror) move)
        (remove #(= move %))
        (into #{})))
 
-(defn trim-unnecessary-moves
+(defn reflection-moves
+  "Return the reflections of the input moves (a set)"
   [moves]
-  (into #{}
-        (first (reduce (fn [[mvs refls] move]
-                         (if-not (contains? refls move)
-                           [(conj mvs move)
-                            (set/union refls (reflections move))]
-                           [mvs refls]))
-                       [#{} #{}]
-                       moves))))
+  (into #{} ((juxt (partial mapv hor-mirror)
+                   (partial mapv vert-mirror)
+                   (partial mapv main-diag-mirror)
+                   (partial mapv sec-diag-mirror)) moves)))
 
-;; Some sprinkle of AI
-(defn compare-move
-  [player moves m1 m2]
-  (if (win? (conj moves (conj m1 player))) ;; can be improved
-    true
-    false))
-
-(defn helper**
+(defn rotation-moves
+  "Return the rotations of the input moves (a set)"
   [moves]
-  (if-not (c/full-or-win? moves)
-    (let [player (c/cur-player moves)
-          all-moves (->> moves
-                         c/board-from
-                         c/available-moves
-                         (sort (partial compare-move player moves))
-                         (into #{}))
-          trimmed-moves (->> (trim-unnecessary-moves all-moves)
-                             (map #(conj % player)))]
-      (->node moves (map #(let [next-moves (conj moves %)]
-                            (helper** next-moves))
-                         trimmed-moves)))
-    (->node moves nil)))
+  (let [rot-90 (->> moves (mapv main-diag-mirror) (mapv vert-mirror))
+        rot-180 (->> moves (mapv hor-mirror) (mapv vert-mirror))
+        rot-270 (->> moves (mapv main-diag-mirror) (mapv hor-mirror))]
+    #{rot-90 rot-180 rot-270}))
 
-(defn build-tree**
+(def roto-reflection-moves (memoize #(set/union (rotation-moves %)
+                                                (reflection-moves %))))
+
+;; CHALLENGE 2: Write a function to build a tree of all possible games. Explain
+;; why or why not it uses content-zipper (above).
+
+;; AR - The following solution is naive, recursive and does not preserve the
+;; stack.
+
+(defn next-moves
+  "Given the current sequence of moves, return a seq of a seq of the
+  next possible moves to perform."
+  [moves]
+  (let [player (c/cur-player moves)]
+    (->> moves
+         c/board-from
+         c/available-moves
+         (map #(conj % player))
+         (map #(conj moves %)))))
+
+(def next-moves-memo (memoize next-moves))
+
+(defn setify-moves
+  [moves]
+  (into #{} moves))
+
+(def setify-moves-memo setify-moves)
+
+(defn setify-all-moves
+  [moves-set]
+  (into #{} (map setify-moves-memo moves-set)))
+
+(defn helper
+  [terminal-moves moves]
+  (if (c/full-or-win? moves)
+    (let [terminal-sets (setify-all-moves terminal-moves)]
+      (if (and (not (contains? terminal-sets (setify-moves moves)))
+               (empty? (set/intersection terminal-sets
+                                         (setify-all-moves (roto-reflection-moves moves)))))
+        (conj terminal-moves moves)
+        terminal-moves))
+    (reduce (fn [accs mvs]
+              (helper accs mvs))
+            terminal-moves
+            (next-moves-memo moves))))
+
+(defn build-tree
   []
-  (helper** []))
+  (helper #{} []))
+
+;; (def tree (build-tree))
+;; (count (filter #(and (c/full? %) (not (c/win? %))) tree)) ;;=> 3 draws
+;; (count (filter c/win? tree)) ;;=> 135 wins
+
+;; CHALLENGE 3: Is it possible to rewrite build-tree so that it's significantly
+;; more efficient in time and/or space? If so, what strategies do you see for
+;; that? Implement one.
+
+;; AR - The solution above is of course not ideal, as the intermediate steps
+;; are not taken into consideration and a lot of branching is repeated.
+
+
+
+
+
+
+
 
 ;; (untested disclosure)
 ;; Another good idea would be to have a BitSet for storing at any given node
@@ -187,15 +196,16 @@
 ;; CHALLENGE 4: write code to answer some of the following questions:
 ;; 1. What percentage of 100000 random games have no win?
 
-(defn nowin-count [root]
-  (count (remove c/win? (map :content (tree-seq branch? children root)))))
+(defn nowin-count [terminal-moves]
+  (count (remove c/win? terminal-moves)))
 
-(defn win% [root]
-  (let [final-boards (map :content (remove :children (tree-seq branch? children root)))
-        wins (count (filter c/win? final-boards))]
-    (/ wins (float (count final-boards)))))
+(defn win% [terminal-moves]
+  (let [wins (count (filter c/win? terminal-moves))]
+    (/ wins (float (count  final-boards)))))
 
 ;; (win% (build-tree**)) => 0.8719512195121951
+;; (win% (build-tree)) => 0.8194130925507901
+
 ;; AR - the count is off, there must be some case not handled correctly
 
 ;; 2. Given a partial game in a particular state, which player if any has

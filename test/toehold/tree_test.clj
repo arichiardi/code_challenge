@@ -2,7 +2,8 @@
   (:require [toehold.tree :as ttree :refer :all]
             [toehold.core :as c :refer :all]
             [clojure.test :as t :refer :all]
-            [clojure.zip :as z])
+            [clojure.zip :as z]
+            [clojure.set :as set])
   (:import [toehold.tree node]))
 
 (defn v->nodes "Build a simple tree of nodes from a nested vector"
@@ -47,36 +48,51 @@
 
 (def dups-mock (->node n [n1 n1])) ;; purposely duplicating
 
-(deftest dups
-  (is (empty? (duplicates n)))
-  (is (empty? (duplicates n1)))
-  (is (= 2 (count (duplicates dups-mock)))))
-
-(deftest mirrors
-  ;; not all the cases here
+(deftest single-move-mirroring
   (is (= [0 2] (vert-mirror [0 0])))
   (is (= [0 1] (vert-mirror [0 1])))
   (is (= [0 0] (vert-mirror [0 2])))
-  (is (= [2 0] (vert-mirror [2 2])))
+  (is (= [1 2] (vert-mirror [1 0])))
   (is (= [1 1] (vert-mirror [1 1])))
+  (is (= [1 0] (vert-mirror [1 2])))
+  (is (= [2 2] (vert-mirror [2 0])))
+  (is (= [2 1] (vert-mirror [2 1])))
+  (is (= [2 0] (vert-mirror [2 2])))
 
   (is (= [2 0] (hor-mirror [0 0])))
+  (is (= [2 1] (hor-mirror [0 1])))
+  (is (= [2 2] (hor-mirror [0 2])))
   (is (= [1 0] (hor-mirror [1 0])))
-  (is (= [0 0] (hor-mirror [2 0])))
   (is (= [1 1] (hor-mirror [1 1])))
+  (is (= [1 2] (hor-mirror [1 2])))
+  (is (= [0 0] (hor-mirror [2 0])))
+  (is (= [0 1] (hor-mirror [2 1])))
+  (is (= [0 2] (hor-mirror [2 2])))
 
-  (is (= [1 1] (origin-mirror [1 1])))
-  (is (= [2 2] (origin-mirror [2 2])))
-  (is (= [0 2] (origin-mirror [2 0])))
-  (is (= [1 0] (origin-mirror [0 1])))
-  (is (= [1 2] (origin-mirror [2 1])))
-  (is (= [2 0] (origin-mirror [0 2])))
-  (is (= [0 1] (origin-mirror [1 0])))
-  (is (= [2 1] (origin-mirror [1 2])))
+  (is (= [0 0] (main-diag-mirror [0 0])))
+  (is (= [1 0] (main-diag-mirror [0 1])))
+  (is (= [2 0] (main-diag-mirror [0 2])))
+  (is (= [0 1] (main-diag-mirror [1 0])))
+  (is (= [1 1] (main-diag-mirror [1 1])))
+  (is (= [2 1] (main-diag-mirror [1 2])))
+  (is (= [0 2] (main-diag-mirror [2 0])))
+  (is (= [1 2] (main-diag-mirror [2 1])))
+  (is (= [2 2] (main-diag-mirror [2 2])))
 
-  (is (= [1 1] (other-diag-mirror [1 1])))
-  (is (= [0 1] (other-diag-mirror [1 2])))
-  (is (= [1 2] (other-diag-mirror [0 1])))
-  (is (= [2 1] (other-diag-mirror [1 0])))
-  (is (= [1 0] (other-diag-mirror [2 1])))
-  (is (= [0 0] (other-diag-mirror [2 2]))))
+  (is (= [2 2] (sec-diag-mirror [0 0])))
+  (is (= [1 2] (sec-diag-mirror [0 1])))
+  (is (= [0 2] (sec-diag-mirror [0 2])))
+  (is (= [2 1] (sec-diag-mirror [1 0])))
+  (is (= [1 1] (sec-diag-mirror [1 1])))
+  (is (= [0 1] (sec-diag-mirror [1 2])))
+  (is (= [2 0] (sec-diag-mirror [2 0])))
+  (is (= [1 0] (sec-diag-mirror [2 1])))
+  (is (= [0 0] (sec-diag-mirror [2 2]))))
+
+(deftest moves-mirroring
+  (let [fm1 [[0 0 :x] [0 1 :o] [1 0 :x] [1 2 :o] [1 1 :x] [2 1 :o] [0 2 :x] [2 0 :o] [2 2 :x]]
+        fm2 [[0 0 :x] [0 1 :o] [1 1 :x] [1 0 :o] [0 2 :x] [2 0 :o] [1 2 :x] [2 1 :o] [2 2 :x]]
+        fm-set (hash-set fm1 fm2)
+        fm1-hor (mapv hor-mirror fm1)]
+    (is (not (empty? (set/intersection fm-set (reflection-moves fm1-hor)))))
+    (is (some fm-set (reflection-moves fm1-hor)))))
