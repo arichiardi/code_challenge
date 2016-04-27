@@ -3,7 +3,8 @@
   :url "http://example.com/FIXME"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
-  :dependencies [[org.clojure/clojure "1.8.0"]
+  :exclusions [org.clojure/clojure]
+  :dependencies [[org.jaunt-lang/jaunt "0.3.0-SNAPSHOT"]
                  [org.clojure/core.logic "0.8.10"]
                  [pjstadig/humane-test-output "0.8.0"]]
   :main ^:skip-aot toehold.core
